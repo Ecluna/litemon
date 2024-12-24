@@ -4,19 +4,33 @@ pub mod disk;
 pub mod network;
 
 use sysinfo::{System, SystemExt};
+use crate::error::Result;
+use self::cpu::{CpuMonitor, CpuStats};
 
 pub struct Monitor {
     sys: System,
+    cpu_monitor: CpuMonitor,
 }
 
 impl Monitor {
     pub fn new() -> Self {
         let mut sys = System::new_all();
         sys.refresh_all();
-        Self { sys }
+        Self {
+            sys,
+            cpu_monitor: CpuMonitor::new(),
+        }
     }
 
     pub fn refresh(&mut self) {
         self.sys.refresh_all();
+    }
+
+    pub fn cpu_stats(&mut self) -> Result<CpuStats> {
+        self.cpu_monitor.collect_stats(&self.sys)
+    }
+
+    pub fn cpu_info(&self) -> String {
+        CpuMonitor::get_cpu_info(&self.sys)
     }
 } 
