@@ -14,6 +14,8 @@ use self::network::{NetworkMonitor, NetworkStats};
 pub struct Monitor {
     sys: System,
     gpu_monitor: Option<gpu::GpuMonitor>,
+    cached_gpu_stats: Option<gpu::GpuStats>,
+    last_gpu_update: std::time::Instant,
     cpu_monitor: CpuMonitor,
     memory_monitor: MemoryMonitor,
     disk_monitor: DiskMonitor,
@@ -28,6 +30,8 @@ impl Monitor {
         Self {
             sys,
             gpu_monitor,
+            cached_gpu_stats: None,
+            last_gpu_update: std::time::Instant::now(),
             cpu_monitor: CpuMonitor::new(),
             memory_monitor: MemoryMonitor::new(),
             disk_monitor: DiskMonitor::new(),
@@ -37,6 +41,13 @@ impl Monitor {
 
     pub fn refresh(&mut self) {
         self.sys.refresh_all();
+        
+        if let Some(gpu) = &self.gpu_monitor {
+            if self.last_gpu_update.elapsed() >= std::time::Duration::from_secs(1) {
+                self.cached_gpu_stats = gpu.collect_stats().ok();
+                self.last_gpu_update = std::time::Instant::now();
+            }
+        }
     }
 
     pub fn cpu_stats(&mut self) -> Result<CpuStats> {
@@ -65,8 +76,8 @@ impl Monitor {
     }
 
     pub fn gpu_stats(&self) -> Result<gpu::GpuStats> {
-        if let Some(gpu) = &self.gpu_monitor {
-            gpu.collect_stats()
+        if let Some(stats) = &self.cached_gpu_stats {
+            Ok(stats.clone())
         } else {
             Err(LiteMonError::NoGpuFound)
         }

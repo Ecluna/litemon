@@ -2,6 +2,7 @@ use nvml_wrapper::Nvml;
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use crate::error::Result;
 
+#[derive(Clone)]
 pub struct GpuStats {
     pub name: String,
     pub utilization: u32,

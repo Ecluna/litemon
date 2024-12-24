@@ -21,7 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scroll_rate = Duration::from_millis(50);
     let mut last_tick = Instant::now();
     let mut last_scroll = Instant::now();
-    let mut redraw_needed = true;
+    let mut redraw_needed = false;
+
+    monitor.refresh();
+    tui.draw(&mut monitor)?;
 
     loop {
         let now = Instant::now();
