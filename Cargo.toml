@@ -2,11 +2,11 @@
 name = "litemon"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Ecluna <168729200@qq.com>"]
 description = "A lightweight system resource monitor written in Rust"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/yourusername/litemon"
+repository = "https://github.com/Ecluna/litemon"
 keywords = ["monitoring", "system", "resources", "cli", "performance"]
 categories = ["command-line-utilities", "monitoring"]
 
@@ -18,3 +18,4 @@ ratatui = "0.24"          # TUI 界面
 anyhow = "1.0"            # 错误处理
 thiserror = "1.0"         # 错误定义
 clap = { version = "4.4", features = ["derive"] }  # 命令行参数解析
+wmi = "0.13"  # Windows Management Instrumentation

@@ -186,12 +186,14 @@ impl Tui {
                     .percent(memory_usage);
 
                 // 内存频率
-                let memory_freq = Paragraph::new(format!(
-                    "频率: {:.1} MHz",
-                    mem_stats.frequency as f64
-                ))
-                .block(Block::default().title("内存频率").borders(Borders::ALL))
-                .style(Style::default().fg(Color::Yellow));
+                let memory_freq = if mem_stats.frequency > 0 {
+                    format!("{} MHz", mem_stats.frequency)
+                } else {
+                    "未知".to_string()
+                };
+                let freq_text = Paragraph::new(memory_freq)
+                    .block(Block::default().title("内存频率").borders(Borders::ALL))
+                    .style(Style::default().fg(Color::Yellow));
 
                 // 交换分区
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
@@ -207,7 +209,7 @@ impl Tui {
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
-                frame.render_widget(memory_freq, memory_chunks[1]);
+                frame.render_widget(freq_text, memory_chunks[1]);
                 frame.render_widget(swap_gauge, memory_chunks[2]);
             }
 
