@@ -135,11 +135,8 @@ impl Tui {
                 frame.render_widget(right_list, core_columns[1]);
             }
 
-            // Memory
+            // Memory 和 Swap 部分
             if let Ok(mem_stats) = monitor.memory_stats() {
-                let memory_usage = (mem_stats.used as f64 / mem_stats.total as f64 * 100.0) as u16;
-                let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
-
                 let memory_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
@@ -148,30 +145,30 @@ impl Tui {
                     ].as_ref())
                     .split(chunks[1]);
 
-                let memory_text = format!(
-                    "已用: {} / 总计: {} ({:.1}%)",
-                    MemoryMonitor::format_bytes(mem_stats.used),
-                    MemoryMonitor::format_bytes(mem_stats.total),
-                    memory_usage as f64
-                );
-
+                // 内存使用率
+                let memory_usage = (mem_stats.used as f64 / mem_stats.total as f64 * 100.0) as u16;
                 let memory_gauge = Gauge::default()
                     .block(Block::default().title("内存使用情况").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Yellow))
-                    .label(memory_text)
+                    .label(format!(
+                        "已用: {} / 总计: {} ({:.1}%)",
+                        MemoryMonitor::format_bytes(mem_stats.used),
+                        MemoryMonitor::format_bytes(mem_stats.total),
+                        memory_usage as f64
+                    ))
                     .percent(memory_usage);
 
-                let swap_text = format!(
-                    "已用: {} / 总计: {} ({:.1}%)",
-                    MemoryMonitor::format_bytes(mem_stats.swap_used),
-                    MemoryMonitor::format_bytes(mem_stats.swap_total),
-                    swap_usage as f64
-                );
-
+                // 交换分区使用率
+                let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
                     .block(Block::default().title("交换分区").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Magenta))
-                    .label(swap_text)
+                    .label(format!(
+                        "已用: {} / 总计: {} ({:.1}%)",
+                        MemoryMonitor::format_bytes(mem_stats.swap_used),
+                        MemoryMonitor::format_bytes(mem_stats.swap_total),
+                        swap_usage as f64
+                    ))
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
@@ -180,26 +177,45 @@ impl Tui {
 
             // Disk
             if let Ok(disk_stats) = monitor.disk_stats() {
+                let disk_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(3),  // 每个磁盘一行
+                    ].as_ref())
+                    .split(chunks[2]);
+
                 let items: Vec<ListItem> = disk_stats
                     .iter()
                     .map(|disk| {
                         let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
+                        let disk_type = if disk.is_removable {
+                            format!("{} [可移动]", disk.disk_type)
+                        } else {
+                            disk.disk_type.clone()
+                        };
+
                         ListItem::new(format!(
-                            "{}: {} / {} ({:.1}%) [{}]",
-                            disk.mount_point,
+                            "{} ({}): {} / {} ({:.1}%)",
+                            disk.name,
+                            disk_type,
                             MemoryMonitor::format_bytes(disk.used_space),
                             MemoryMonitor::format_bytes(disk.total_space),
-                            usage,
-                            disk.disk_type
-                        ))
+                            usage
+                        )).style(Style::default().fg(if usage > 90.0 {
+                            Color::Red
+                        } else if usage > 70.0 {
+                            Color::Yellow
+                        } else {
+                            Color::Green
+                        }))
                     })
                     .collect();
 
-                let list = List::new(items)
+                let disk_list = List::new(items)
                     .block(Block::default().title("磁盘使用情况").borders(Borders::ALL))
                     .style(Style::default().fg(Color::Green));
 
-                frame.render_widget(list, chunks[2]);
+                frame.render_widget(disk_list, chunks[2]);
             }
 
             // Network
