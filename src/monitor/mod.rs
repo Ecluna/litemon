@@ -7,11 +7,13 @@ use sysinfo::{System, SystemExt};
 use crate::error::Result;
 use self::cpu::{CpuMonitor, CpuStats};
 use self::memory::{MemoryMonitor, MemoryStats};
+use self::disk::{DiskMonitor, DiskStats};
 
 pub struct Monitor {
     sys: System,
     cpu_monitor: CpuMonitor,
     memory_monitor: MemoryMonitor,
+    disk_monitor: DiskMonitor,
 }
 
 impl Monitor {
@@ -22,6 +24,7 @@ impl Monitor {
             sys,
             cpu_monitor: CpuMonitor::new(),
             memory_monitor: MemoryMonitor::new(),
+            disk_monitor: DiskMonitor::new(),
         }
     }
 
@@ -39,5 +42,9 @@ impl Monitor {
 
     pub fn memory_stats(&self) -> Result<MemoryStats> {
         self.memory_monitor.collect_stats(&self.sys)
+    }
+
+    pub fn disk_stats(&self) -> Result<Vec<DiskStats>> {
+        self.disk_monitor.collect_stats(&self.sys)
     }
 } 
