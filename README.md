@@ -9,15 +9,20 @@
 - 🚀 低资源占用
 - 📈 支持以下监控项目：
   - CPU 使用率和频率
-  - GPU 状态（NVIDIA）
+  - GPU 状态（仅 NVIDIA）
   - 内存使用情况
   - 磁盘使用情况
   - 网络流量
 
 ## 🔧 系统要求
 
-- 支持的操作系统：Windows、Linux
-- 如需 GPU 监控功能，需要 NVIDIA 显卡和驱动程序
+- 支持的操作系统：
+  - Windows
+  - Linux
+  - macOS
+- GPU 监控功能说明：
+  - Windows/Linux：需要 NVIDIA 显卡和驱动程序
+  - macOS：由于 NVML 限制，暂不支持 GPU 监控
 
 ## 📦 安装
 
@@ -25,17 +30,27 @@
 
 1. 确保已安装 Rust 工具链：
 ```bash
+# Windows
+winget install Rustlang.Rust
+
+# macOS
+brew install rust
+
+# Linux
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
+
 2. 克隆仓库：
 ```bash
 git clone https://github.com/Ecluna/litemon.git
 cd litemon
 ```
+
 3. 编译并安装：
 ```bash
 cargo install --path .
 ```
+
 ## 🚀 使用方法
 
 直接运行程序：
