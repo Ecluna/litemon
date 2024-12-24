@@ -19,8 +19,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tick_rate = Duration::from_secs(1);
     let mut last_tick = std::time::Instant::now();
+    let mut redraw_needed = true;
 
     loop {
+        if redraw_needed {
+            monitor.refresh();
+            tui.draw(&mut monitor)?;
+            redraw_needed = false;
+        }
+
         if last_tick.elapsed() >= tick_rate {
             monitor.refresh();
             tui.draw(&mut monitor)?;
@@ -34,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Up | KeyCode::Down => {
                         if let Ok(cpu_stats) = monitor.cpu_stats() {
                             tui.handle_scroll(key, cpu_stats.core_usage.len());
-                            tui.draw(&mut monitor)?;
+                            redraw_needed = true;
                         }
                     }
                     _ => {}
