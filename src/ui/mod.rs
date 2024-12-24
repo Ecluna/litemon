@@ -83,7 +83,7 @@ impl Tui {
                 .constraints([
                     Constraint::Length(3),  // CPU型号
                     Constraint::Length(3),  // CPU使用率
-                    Constraint::Min(0),     // CPU核心列表
+                    Constraint::Min(0),     // CPU核��列表
                     Constraint::Length(10), // GPU 信息
                 ].as_ref())
                 .split(main_chunks[0]);
@@ -184,35 +184,47 @@ impl Tui {
                 let memory_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Length(3),  // 内存使用率
-                        Constraint::Length(3),  // 交换分区使用率
+                        Constraint::Length(4),  // 增加内存使用率显示空间
+                        Constraint::Length(2),  // 减少交换分区显示空间
                     ].as_ref())
                     .split(info_chunks[0]);
 
-                // 内存使用率
+                // 内存使用率 - 增加显示内容
                 let memory_usage = (mem_stats.used as f64 / mem_stats.total as f64 * 100.0) as u16;
                 let memory_gauge = Gauge::default()
-                    .block(Block::default().title("内存使用情况").borders(Borders::ALL))
-                    .gauge_style(Style::default().fg(Color::Yellow))
+                    .block(Block::default()
+                        .title("内存使用情况")
+                        .borders(Borders::ALL))
+                    .gauge_style(Style::default().fg(if memory_usage > 90 {
+                        Color::Red
+                    } else if memory_usage > 70 {
+                        Color::Yellow
+                    } else {
+                        Color::Green
+                    }))
                     .label(format!(
-                        "已用: {} / 总计: {} ({:.1}%)",
+                        "已用: {} / 总计: {} ({:.1}%) [可用: {}]",
                         MemoryMonitor::format_bytes(mem_stats.used),
                         MemoryMonitor::format_bytes(mem_stats.total),
-                        memory_usage as f64
+                        memory_usage as f64,
+                        MemoryMonitor::format_bytes(mem_stats.available),
                     ))
                     .percent(memory_usage);
 
-                // 交换分区
+                // 交换分区 - 简化显示
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
-                    .block(Block::default().title("交换分区").borders(Borders::ALL))
-                    .gauge_style(Style::default().fg(Color::Magenta))
-                    .label(format!(
-                        "已用: {} / 总计: {} ({:.1}%)",
-                        MemoryMonitor::format_bytes(mem_stats.swap_used),
-                        MemoryMonitor::format_bytes(mem_stats.swap_total),
-                        swap_usage as f64
-                    ))
+                    .block(Block::default()
+                        .title("交换分区")
+                        .borders(Borders::ALL))
+                    .gauge_style(Style::default().fg(if swap_usage > 50 {
+                        Color::Red
+                    } else if swap_usage > 25 {
+                        Color::Yellow
+                    } else {
+                        Color::Green
+                    }))
+                    .label(format!("已用: {:.1}%", swap_usage as f64))
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
