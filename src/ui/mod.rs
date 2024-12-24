@@ -1,6 +1,6 @@
 use std::io;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, KeyEvent, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture, KeyEvent, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -70,7 +70,7 @@ impl Tui {
         Ok(())
     }
 
-    fn update_history(&mut self, monitor: &Monitor) {
+    fn update_history(&mut self, monitor: &mut Monitor) {
         if let Ok(disk_stats) = monitor.disk_stats() {
             if self.disk_history.is_empty() {
                 self.disk_history = vec![Vec::with_capacity(self.history_len); disk_stats.len()];
@@ -223,15 +223,14 @@ impl Tui {
                         .map(|(_, usage)| *usage as u64)
                         .collect();
 
-                    let disk_info = format!(
-                        "{}: {} / {} ({:.1}%)",
-                        disk.name,
-                        MemoryMonitor::format_bytes(disk.used_space),
-                        MemoryMonitor::format_bytes(disk.total_space),
-                        usage
-                    );
-
                     let disk_block = Block::default()
+                        .title(format!(
+                            "{}: {} / {} ({:.1}%)",
+                            disk.name,
+                            MemoryMonitor::format_bytes(disk.used_space),
+                            MemoryMonitor::format_bytes(disk.total_space),
+                            usage
+                        ))
                         .borders(Borders::ALL)
                         .style(Style::default().fg(if usage > 90.0 {
                             Color::Red
