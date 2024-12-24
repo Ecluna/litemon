@@ -28,8 +28,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) = event::read()? {
-                break;
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Up | KeyCode::Down => {
+                        if let Ok(cpu_stats) = monitor.cpu_stats() {
+                            tui.handle_scroll(key, cpu_stats.core_usage.len());
+                            tui.draw(&mut monitor)?;
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
     }

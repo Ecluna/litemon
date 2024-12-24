@@ -24,13 +24,33 @@ use crate::{
 
 pub struct Tui {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
+    cpu_scroll: usize,
 }
 
 impl Tui {
     pub fn new() -> Result<Self> {
         let backend = CrosstermBackend::new(io::stdout());
         let terminal = Terminal::new(backend)?;
-        Ok(Self { terminal })
+        Ok(Self { 
+            terminal,
+            cpu_scroll: 0,
+        })
+    }
+
+    pub fn handle_scroll(&mut self, key: KeyEvent, max_cores: usize) {
+        match key.code {
+            KeyCode::Up => {
+                if self.cpu_scroll > 0 {
+                    self.cpu_scroll -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if self.cpu_scroll < max_cores.saturating_sub(10) {
+                    self.cpu_scroll += 1;
+                }
+            }
+            _ => {}
+        }
     }
 
     pub fn init(&mut self) -> Result<()> {
@@ -64,9 +84,9 @@ impl Tui {
                 .margin(1)
                 .constraints([
                     Constraint::Length(cpu_height as u16),  // 动态CPU区域高度
-                    Constraint::Length(6),   // Memory
-                    Constraint::Length(6),   // Disk
-                    Constraint::Min(6),      // Network
+                    Constraint::Length(8),   // Memory (增加高度)
+                    Constraint::Length(8),   // Disk (增加高度)
+                    Constraint::Min(8),      // Network
                 ].as_ref())
                 .split(size);
 
@@ -94,9 +114,9 @@ impl Tui {
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, cpu_chunks[1]);
 
-                // 计算核心列表布局
                 let core_count = cpu_stats.core_usage.len();
-                let left_cores = (core_count + 1) / 2;  // 向上取整
+                let cores_per_column = 5;
+                let visible_cores = cores_per_column * 2;
 
                 let cores_area = cpu_chunks[2];
                 let core_columns = Layout::default()
@@ -107,28 +127,41 @@ impl Tui {
                     ].as_ref())
                     .split(cores_area);
 
-                // 左侧核心列表（0-9）
+                // 左侧核心列表
                 let left_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
-                    .take(left_cores)
+                    .skip(self.cpu_scroll)
+                    .take(cores_per_column)
                     .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
-                // 右侧核心列表（10-19）
+                // 右侧核心列表
                 let right_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
-                    .skip(left_cores)
+                    .skip(self.cpu_scroll + cores_per_column)
+                    .take(cores_per_column)
                     .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
+                let scroll_indicator = format!(
+                    "CPU核心状态 ({}-{}/{})",
+                    self.cpu_scroll,
+                    (self.cpu_scroll + visible_cores).min(core_count),
+                    core_count
+                );
+
                 let left_list = List::new(left_items)
-                    .block(Block::default().title("CPU核心状态 (1)").borders(Borders::ALL))
+                    .block(Block::default()
+                        .title(format!("{} (1)", scroll_indicator))
+                        .borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
 
                 let right_list = List::new(right_items)
-                    .block(Block::default().title("CPU核心状态 (2)").borders(Borders::ALL))
+                    .block(Block::default()
+                        .title(format!("{} (2)", scroll_indicator))
+                        .borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
 
                 frame.render_widget(left_list, core_columns[0]);
@@ -140,8 +173,8 @@ impl Tui {
                 let memory_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Length(3),  // 内存使用率
-                        Constraint::Length(3),  // 交换分区使用率
+                        Constraint::Length(4),  // 内存使用率 (增加高度)
+                        Constraint::Length(4),  // 交换分区使用率 (增加高度)
                     ].as_ref())
                     .split(chunks[1]);
 
@@ -177,13 +210,6 @@ impl Tui {
 
             // Disk
             if let Ok(disk_stats) = monitor.disk_stats() {
-                let disk_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(3),  // 每个磁盘一行
-                    ].as_ref())
-                    .split(chunks[2]);
-
                 let items: Vec<ListItem> = disk_stats
                     .iter()
                     .map(|disk| {
