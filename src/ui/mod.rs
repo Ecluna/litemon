@@ -8,7 +8,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Sparkline},
     Terminal,
 };
 
@@ -25,6 +25,9 @@ use crate::{
 pub struct Tui {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     cpu_scroll: usize,
+    disk_history: Vec<Vec<(String, f64)>>,
+    network_history: Vec<Vec<(String, f64)>>,
+    history_len: usize,
 }
 
 impl Tui {
@@ -34,6 +37,9 @@ impl Tui {
         Ok(Self { 
             terminal,
             cpu_scroll: 0,
+            disk_history: Vec::new(),
+            network_history: Vec::new(),
+            history_len: 50,
         })
     }
 
@@ -64,43 +70,72 @@ impl Tui {
         Ok(())
     }
 
+    fn update_history(&mut self, monitor: &Monitor) {
+        if let Ok(disk_stats) = monitor.disk_stats() {
+            if self.disk_history.is_empty() {
+                self.disk_history = vec![Vec::with_capacity(self.history_len); disk_stats.len()];
+            }
+            for (i, disk) in disk_stats.iter().enumerate() {
+                let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
+                if self.disk_history[i].len() >= self.history_len {
+                    self.disk_history[i].remove(0);
+                }
+                self.disk_history[i].push((disk.name.clone(), usage));
+            }
+        }
+
+        if let Ok(net_stats) = monitor.network_stats() {
+            if self.network_history.is_empty() {
+                self.network_history = vec![Vec::with_capacity(self.history_len); net_stats.len()];
+            }
+            for (i, net) in net_stats.iter().enumerate() {
+                let speed = net.received_bytes as f64 + net.transmitted_bytes as f64;
+                if self.network_history[i].len() >= self.history_len {
+                    self.network_history[i].remove(0);
+                }
+                self.network_history[i].push((net.interface_name.clone(), speed));
+            }
+        }
+    }
+
     pub fn draw(&mut self, monitor: &mut Monitor) -> Result<()> {
+        self.update_history(monitor);
+
         self.terminal.draw(|frame| {
             let size = frame.size();
-            
-            // 计算CPU区域所需的高度
-            let cpu_height = if let Ok(cpu_stats) = monitor.cpu_stats() {
-                // 计算显示所有核心所需的行数
-                let core_count = cpu_stats.core_usage.len();
-                let cores_per_column = (core_count + 1) / 2;  // 向上取整
-                // CPU信息(3) + CPU使用率(3) + 核心数量 + 边框
-                3 + 3 + cores_per_column + 2
-            } else {
-                20  // 默认高度
-            };
 
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(1)
+            // 将界面分为左右两栏
+            let main_chunks = Layout::default()
+                .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Length(cpu_height as u16),  // 动态CPU区域高度
-                    Constraint::Length(8),   // Memory (增加高度)
-                    Constraint::Length(8),   // Disk (增加高度)
-                    Constraint::Min(8),      // Network
+                    Constraint::Percentage(50),  // 左侧 CPU 信息
+                    Constraint::Percentage(50),  // 右侧其他信息
                 ].as_ref())
                 .split(size);
 
-            // CPU
-            if let Ok(cpu_stats) = monitor.cpu_stats() {
-                let cpu_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(3),  // CPU型号
-                        Constraint::Length(3),  // 总体 CPU 使用率
-                        Constraint::Min(0),     // CPU 核心列表 (剩余空间)
-                    ].as_ref())
-                    .split(chunks[0]);
+            // 左侧 CPU 相关信息布局
+            let cpu_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),  // CPU型号
+                    Constraint::Length(3),  // 总体使用率
+                    Constraint::Min(0),     // CPU核心列表
+                ].as_ref())
+                .split(main_chunks[0]);
 
+            // 右侧信息布局
+            let info_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),  // 内存使用率
+                    Constraint::Length(3),  // 交换分区
+                    Constraint::Length(6),  // 磁盘信息
+                    Constraint::Min(4),     // 网络信息
+                ].as_ref())
+                .split(main_chunks[1]);
+
+            // CPU 信息渲染
+            if let Ok(cpu_stats) = monitor.cpu_stats() {
                 // CPU型号信息
                 let cpu_info = Paragraph::new(monitor.cpu_info())
                     .block(Block::default().title("CPU信息").borders(Borders::ALL))
@@ -114,71 +149,35 @@ impl Tui {
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, cpu_chunks[1]);
 
+                // CPU 核心列表
                 let core_count = cpu_stats.core_usage.len();
-                let cores_per_column = 5;
-                let visible_cores = cores_per_column * 2;
+                let cores_per_page = ((cpu_chunks[2].height as usize - 2) / 2) * 2; // 确保是偶数
 
-                let cores_area = cpu_chunks[2];
-                let core_columns = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Percentage(50),
-                        Constraint::Percentage(50),
-                    ].as_ref())
-                    .split(cores_area);
-
-                // 左侧核心列表
-                let left_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
+                let items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
                     .skip(self.cpu_scroll)
-                    .take(cores_per_column)
-                    .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
-                    .collect();
-
-                // 右侧核心列表
-                let right_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
-                    .zip(cpu_stats.frequency.iter())
-                    .enumerate()
-                    .skip(self.cpu_scroll + cores_per_column)
-                    .take(cores_per_column)
+                    .take(cores_per_page)
                     .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
                 let scroll_indicator = format!(
                     "CPU核心状态 ({}-{}/{})",
                     self.cpu_scroll,
-                    (self.cpu_scroll + visible_cores).min(core_count),
+                    (self.cpu_scroll + cores_per_page).min(core_count),
                     core_count
                 );
 
-                let left_list = List::new(left_items)
-                    .block(Block::default()
-                        .title(format!("{} (1)", scroll_indicator))
-                        .borders(Borders::ALL))
+                let cores_list = List::new(items)
+                    .block(Block::default().title(scroll_indicator).borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
 
-                let right_list = List::new(right_items)
-                    .block(Block::default()
-                        .title(format!("{} (2)", scroll_indicator))
-                        .borders(Borders::ALL))
-                    .style(Style::default().fg(Color::Cyan));
-
-                frame.render_widget(left_list, core_columns[0]);
-                frame.render_widget(right_list, core_columns[1]);
+                frame.render_widget(cores_list, cpu_chunks[2]);
             }
 
-            // Memory 和 Swap 部分
+            // 右侧信息渲染
+            // Memory
             if let Ok(mem_stats) = monitor.memory_stats() {
-                let memory_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(4),  // 内存使用率 (增加高度)
-                        Constraint::Length(4),  // 交换分区使用率 (增加高度)
-                    ].as_ref())
-                    .split(chunks[1]);
-
-                // 内存使用率
                 let memory_usage = (mem_stats.used as f64 / mem_stats.total as f64 * 100.0) as u16;
                 let memory_gauge = Gauge::default()
                     .block(Block::default().title("内存使用情况").borders(Borders::ALL))
@@ -191,7 +190,6 @@ impl Tui {
                     ))
                     .percent(memory_usage);
 
-                // 交换分区使用率
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
                     .block(Block::default().title("交换分区").borders(Borders::ALL))
@@ -204,67 +202,90 @@ impl Tui {
                     ))
                     .percent(swap_usage);
 
-                frame.render_widget(memory_gauge, memory_chunks[0]);
-                frame.render_widget(swap_gauge, memory_chunks[1]);
+                frame.render_widget(memory_gauge, info_chunks[0]);
+                frame.render_widget(swap_gauge, info_chunks[1]);
             }
 
-            // Disk
+            // Disk with sparkline
             if let Ok(disk_stats) = monitor.disk_stats() {
-                let items: Vec<ListItem> = disk_stats
-                    .iter()
-                    .map(|disk| {
-                        let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
-                        let disk_type = if disk.is_removable {
-                            format!("{} [可移动]", disk.disk_type)
-                        } else {
-                            disk.disk_type.clone()
-                        };
+                let disk_area = info_chunks[2];
+                let disk_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(
+                        disk_stats.iter().map(|_| Constraint::Length(3)).collect::<Vec<_>>()
+                    )
+                    .split(disk_area);
 
-                        ListItem::new(format!(
-                            "{} ({}): {} / {} ({:.1}%)",
-                            disk.name,
-                            disk_type,
-                            MemoryMonitor::format_bytes(disk.used_space),
-                            MemoryMonitor::format_bytes(disk.total_space),
-                            usage
-                        )).style(Style::default().fg(if usage > 90.0 {
+                for (i, disk) in disk_stats.iter().enumerate() {
+                    let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
+                    let sparkline_data: Vec<u64> = self.disk_history[i]
+                        .iter()
+                        .map(|(_, usage)| *usage as u64)
+                        .collect();
+
+                    let disk_info = format!(
+                        "{}: {} / {} ({:.1}%)",
+                        disk.name,
+                        MemoryMonitor::format_bytes(disk.used_space),
+                        MemoryMonitor::format_bytes(disk.total_space),
+                        usage
+                    );
+
+                    let disk_block = Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(if usage > 90.0 {
                             Color::Red
                         } else if usage > 70.0 {
                             Color::Yellow
                         } else {
                             Color::Green
-                        }))
-                    })
-                    .collect();
+                        }));
 
-                let disk_list = List::new(items)
-                    .block(Block::default().title("磁盘使用情况").borders(Borders::ALL))
-                    .style(Style::default().fg(Color::Green));
+                    let sparkline = Sparkline::default()
+                        .block(disk_block)
+                        .data(&sparkline_data)
+                        .style(Style::default().fg(Color::Green))
+                        .max(100);
 
-                frame.render_widget(disk_list, chunks[2]);
+                    frame.render_widget(sparkline, disk_chunks[i]);
+                }
             }
 
-            // Network
+            // Network with sparkline
             if let Ok(net_stats) = monitor.network_stats() {
-                let items: Vec<ListItem> = net_stats
-                    .iter()
-                    .map(|net| {
-                        ListItem::new(format!(
-                            "{}: ↓{}/s ↑{}/s (总计: ↓{} ↑{})",
-                            net.interface_name,
-                            NetworkMonitor::format_speed(net.received_bytes as f64),
-                            NetworkMonitor::format_speed(net.transmitted_bytes as f64),
-                            MemoryMonitor::format_bytes(net.total_received),
-                            MemoryMonitor::format_bytes(net.total_transmitted),
-                        ))
-                    })
-                    .collect();
+                let net_area = info_chunks[3];
+                let net_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(
+                        net_stats.iter().map(|_| Constraint::Length(3)).collect::<Vec<_>>()
+                    )
+                    .split(net_area);
 
-                let list = List::new(items)
-                    .block(Block::default().title("网络接口��态").borders(Borders::ALL))
-                    .style(Style::default().fg(Color::Blue));
+                for (i, net) in net_stats.iter().enumerate() {
+                    let sparkline_data: Vec<u64> = self.network_history[i]
+                        .iter()
+                        .map(|(_, speed)| *speed as u64)
+                        .collect();
 
-                frame.render_widget(list, chunks[3]);
+                    let net_info = format!(
+                        "{}: ↓{}/s ↑{}/s",
+                        net.interface_name,
+                        NetworkMonitor::format_speed(net.received_bytes as f64),
+                        NetworkMonitor::format_speed(net.transmitted_bytes as f64),
+                    );
+
+                    let net_block = Block::default()
+                        .title(net_info)
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::Blue));
+
+                    let sparkline = Sparkline::default()
+                        .block(net_block)
+                        .data(&sparkline_data)
+                        .style(Style::default().fg(Color::Blue));
+
+                    frame.render_widget(sparkline, net_chunks[i]);
+                }
             }
         })?;
 
