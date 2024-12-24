@@ -115,7 +115,7 @@ impl Tui {
                     Constraint::Length(3),  // 内存使用率
                     Constraint::Length(3),  // 交换分区
                     Constraint::Length(6),  // 磁盘信息
-                    Constraint::Min(4),     // 网络信息
+                    Constraint::Min(4),     // 网���信息
                 ].as_ref())
                 .split(main_chunks[1]);
 
@@ -167,7 +167,6 @@ impl Tui {
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Length(3),  // 内存使用率
-                        Constraint::Length(3),  // 内存频率
                         Constraint::Length(3),  // 交换分区使用率
                     ].as_ref())
                     .split(info_chunks[0]);
@@ -185,16 +184,6 @@ impl Tui {
                     ))
                     .percent(memory_usage);
 
-                // 内存频率
-                let memory_freq = if mem_stats.frequency > 0 {
-                    format!("{} MHz", mem_stats.frequency)
-                } else {
-                    "未知".to_string()
-                };
-                let freq_text = Paragraph::new(memory_freq)
-                    .block(Block::default().title("内存频率").borders(Borders::ALL))
-                    .style(Style::default().fg(Color::Yellow));
-
                 // 交换分区
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
@@ -209,8 +198,7 @@ impl Tui {
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
-                frame.render_widget(freq_text, memory_chunks[1]);
-                frame.render_widget(swap_gauge, memory_chunks[2]);
+                frame.render_widget(swap_gauge, memory_chunks[1]);
             }
 
             // Disk with sparkline
