@@ -83,7 +83,7 @@ impl Tui {
                 .constraints([
                     Constraint::Length(3),  // CPU型号
                     Constraint::Length(3),  // CPU使用率
-                    Constraint::Min(0),     // CPU核列表
+                    Constraint::Min(0),     // CPU核��表
                     Constraint::Length(10), // GPU 信息
                 ].as_ref())
                 .split(main_chunks[0]);
@@ -107,9 +107,21 @@ impl Tui {
                 frame.render_widget(cpu_info, left_chunks[0]);
 
                 // 总体 CPU 使用率
+                let avg_freq = cpu_stats.frequency.iter().sum::<u64>() as f64 / cpu_stats.frequency.len() as f64;
                 let gauge = Gauge::default()
                     .block(Block::default().title("总体CPU使用率").borders(Borders::ALL))
-                    .gauge_style(Style::default().fg(Color::Cyan))
+                    .gauge_style(Style::default().fg(if cpu_stats.total_usage > 80.0 {
+                        Color::Red
+                    } else if cpu_stats.total_usage > 50.0 {
+                        Color::Yellow
+                    } else {
+                        Color::Cyan
+                    }))
+                    .label(format!(
+                        "{}% │ {:.1} GHz",
+                        cpu_stats.total_usage as u16,
+                        avg_freq / 1000.0
+                    ))
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, left_chunks[1]);
 
