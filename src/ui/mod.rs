@@ -83,7 +83,7 @@ impl Tui {
                 .constraints([
                     Constraint::Length(3),  // CPU型号
                     Constraint::Length(3),  // CPU使用率
-                    Constraint::Min(0),     // CPU核��列表
+                    Constraint::Min(0),     // CPU核列表
                     Constraint::Length(10), // GPU 信息
                 ].as_ref())
                 .split(main_chunks[0]);
@@ -211,7 +211,7 @@ impl Tui {
                     ))
                     .percent(memory_usage);
 
-                // 交换分区 - 简化显示
+                // 交换分区显示
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
                     .block(Block::default()
@@ -224,7 +224,11 @@ impl Tui {
                     } else {
                         Color::Green
                     }))
-                    .label(format!("已用: {:.1}%", swap_usage as f64))
+                    .label(format!(
+                        "{} / {}",
+                        MemoryMonitor::format_bytes(mem_stats.swap_used),
+                        MemoryMonitor::format_bytes(mem_stats.swap_total),
+                    ))
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
