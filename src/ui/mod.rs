@@ -47,11 +47,23 @@ impl Tui {
     pub fn draw(&mut self, monitor: &mut Monitor) -> Result<()> {
         self.terminal.draw(|frame| {
             let size = frame.size();
+            
+            // 计算CPU区域所需的高度
+            let cpu_height = if let Ok(cpu_stats) = monitor.cpu_stats() {
+                // 计算显示所有核心所需的行数
+                let core_count = cpu_stats.core_usage.len();
+                let cores_per_column = (core_count + 1) / 2;  // 向上取整
+                // CPU信息(3) + CPU使用率(3) + 核心数量 + 边框
+                3 + 3 + cores_per_column + 2
+            } else {
+                20  // 默认高度
+            };
+
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([
-                    Constraint::Length(20),  // CPU
+                    Constraint::Length(cpu_height as u16),  // 动态CPU区域高度
                     Constraint::Length(6),   // Memory
                     Constraint::Length(6),   // Disk
                     Constraint::Min(6),      // Network
@@ -60,13 +72,12 @@ impl Tui {
 
             // CPU
             if let Ok(cpu_stats) = monitor.cpu_stats() {
-                // 创建 CPU 区域的子布局
                 let cpu_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Length(3),  // CPU型号
                         Constraint::Length(3),  // 总体 CPU 使用率
-                        Constraint::Min(0),     // CPU 核心列表
+                        Constraint::Min(0),     // CPU 核心列表 (剩余空间)
                     ].as_ref())
                     .split(chunks[0]);
 
@@ -83,7 +94,10 @@ impl Tui {
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, cpu_chunks[1]);
 
-                // 将核心列表区域分为左右两列
+                // 计算核心列表布局
+                let core_count = cpu_stats.core_usage.len();
+                let left_cores = (core_count + 1) / 2;  // 向上取整
+
                 let cores_area = cpu_chunks[2];
                 let core_columns = Layout::default()
                     .direction(Direction::Horizontal)
@@ -92,10 +106,6 @@ impl Tui {
                         Constraint::Percentage(50),
                     ].as_ref())
                     .split(cores_area);
-
-                // 调整核心列表显示，确保所有核心都能显示
-                let core_count = cpu_stats.core_usage.len();
-                let left_cores = (core_count + 1) / 2;  // 向上取整
 
                 // 左侧核心列表（0-9）
                 let left_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
