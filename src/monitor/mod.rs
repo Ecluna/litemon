@@ -6,10 +6,12 @@ pub mod network;
 use sysinfo::{System, SystemExt};
 use crate::error::Result;
 use self::cpu::{CpuMonitor, CpuStats};
+use self::memory::{MemoryMonitor, MemoryStats};
 
 pub struct Monitor {
     sys: System,
     cpu_monitor: CpuMonitor,
+    memory_monitor: MemoryMonitor,
 }
 
 impl Monitor {
@@ -19,6 +21,7 @@ impl Monitor {
         Self {
             sys,
             cpu_monitor: CpuMonitor::new(),
+            memory_monitor: MemoryMonitor::new(),
         }
     }
 
@@ -32,5 +35,9 @@ impl Monitor {
 
     pub fn cpu_info(&self) -> String {
         CpuMonitor::get_cpu_info(&self.sys)
+    }
+
+    pub fn memory_stats(&self) -> Result<MemoryStats> {
+        self.memory_monitor.collect_stats(&self.sys)
     }
 } 
