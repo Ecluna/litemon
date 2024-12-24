@@ -8,7 +8,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem},
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
     Frame, Terminal,
 };
 
@@ -50,7 +50,7 @@ impl Tui {
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([
-                    Constraint::Length(12),  // CPU (增加高度以显示更多信息)
+                    Constraint::Length(15),  // CPU (增加高度以适应更多内容)
                     Constraint::Length(8),   // Memory
                     Constraint::Length(8),   // Disk
                     Constraint::Min(8),      // Network
@@ -63,49 +63,64 @@ impl Tui {
                 let cpu_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
+                        Constraint::Length(2),  // CPU型号
                         Constraint::Length(3),  // 总体 CPU 使用率
                         Constraint::Min(0),     // CPU 核心列表
                     ].as_ref())
                     .split(chunks[0]);
+
+                // CPU型号信息
+                let cpu_info = Paragraph::new(monitor.cpu_info())
+                    .block(Block::default().borders(Borders::ALL))
+                    .style(Style::default().fg(Color::Cyan));
+                frame.render_widget(cpu_info, cpu_chunks[0]);
 
                 // 总体 CPU 使用率
                 let gauge = Gauge::default()
                     .block(Block::default().title("总体CPU使用率").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Cyan))
                     .percent(cpu_stats.total_usage as u16);
-                frame.render_widget(gauge, cpu_chunks[0]);
+                frame.render_widget(gauge, cpu_chunks[1]);
 
-                // CPU 核心列表
-                let core_items: Vec<ListItem> = cpu_stats.core_usage.iter()
+                // 将核心列表区域分为左右两列
+                let cores_area = cpu_chunks[2];
+                let core_columns = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(50),
+                    ].as_ref())
+                    .split(cores_area);
+
+                let core_count = cpu_stats.core_usage.len();
+                let left_cores = core_count / 2 + core_count % 2;
+
+                // 左侧核心列表
+                let left_items: Vec<ListItem> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
-                    .map(|(i, (usage, freq))| {
-                        let usage_gauge = format!(
-                            "{:3.1}% [{}{}]",
-                            usage,
-                            "█".repeat((usage * 0.2) as usize),
-                            "░".repeat((20.0 - usage * 0.2) as usize)
-                        );
-                        ListItem::new(format!(
-                            "核心 #{:2}: {} │ {:.1} GHz",
-                            i,
-                            usage_gauge,
-                            *freq as f64 / 1000.0
-                        )).style(Style::default().fg(if *usage > 80.0 {
-                            Color::Red
-                        } else if *usage > 50.0 {
-                            Color::Yellow
-                        } else {
-                            Color::Green
-                        }))
-                    })
+                    .take(left_cores)
+                    .map(|(i, (usage, freq))| create_core_list_item(i, *usage, *freq))
                     .collect();
 
-                let cores_list = List::new(core_items)
-                    .block(Block::default().title("CPU核心状态").borders(Borders::ALL))
+                // 右侧核心列表
+                let right_items: Vec<ListItem> = cpu_stats.core_usage.iter()
+                    .zip(cpu_stats.frequency.iter())
+                    .enumerate()
+                    .skip(left_cores)
+                    .map(|(i, (usage, freq))| create_core_list_item(i, *usage, *freq))
+                    .collect();
+
+                let left_list = List::new(left_items)
+                    .block(Block::default().title("CPU核心状态 (1)").borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
 
-                frame.render_widget(cores_list, cpu_chunks[1]);
+                let right_list = List::new(right_items)
+                    .block(Block::default().title("CPU核心状态 (2)").borders(Borders::ALL))
+                    .style(Style::default().fg(Color::Cyan));
+
+                frame.render_widget(left_list, core_columns[0]);
+                frame.render_widget(right_list, core_columns[1]);
             }
 
             // Memory
@@ -191,5 +206,27 @@ impl Tui {
         )?;
         self.terminal.show_cursor()?;
         Ok(())
+    }
+
+    // 辅助函数：创建核心列表项
+    fn create_core_list_item(index: usize, usage: f32, freq: u64) -> ListItem {
+        let usage_gauge = format!(
+            "{:3.1}% [{}{}]",
+            usage,
+            "█".repeat((usage * 0.2) as usize),
+            "░".repeat((20.0 - usage * 0.2) as usize)
+        );
+        ListItem::new(format!(
+            "核心 #{:2}: {} │ {:.1} GHz",
+            index,
+            usage_gauge,
+            freq as f64 / 1000.0
+        )).style(Style::default().fg(if usage > 80.0 {
+            Color::Red
+        } else if usage > 50.0 {
+            Color::Yellow
+        } else {
+            Color::Green
+        }))
     }
 } 
