@@ -68,22 +68,23 @@ impl Tui {
         self.terminal.draw(|frame| {
             let size = frame.size();
 
-            // 将界面分为左右两栏
+            // 将界面分为左右栏
             let main_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(50),  // 左侧 CPU 信息
+                    Constraint::Percentage(50),  // 左侧 CPU 和 GPU 信息
                     Constraint::Percentage(50),  // 右侧其他信息
                 ].as_ref())
                 .split(size);
 
-            // 左侧 CPU 相关信息布局
-            let cpu_chunks = Layout::default()
+            // 左侧布局
+            let left_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Length(3),  // CPU型号
-                    Constraint::Length(3),  // 总体使用率
+                    Constraint::Length(3),  // CPU使用率
                     Constraint::Min(0),     // CPU核心列表
+                    Constraint::Length(10), // GPU 信息
                 ].as_ref())
                 .split(main_chunks[0]);
 
@@ -103,18 +104,18 @@ impl Tui {
                 let cpu_info = Paragraph::new(monitor.cpu_info())
                     .block(Block::default().title("CPU信息").borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
-                frame.render_widget(cpu_info, cpu_chunks[0]);
+                frame.render_widget(cpu_info, left_chunks[0]);
 
                 // 总体 CPU 使用率
                 let gauge = Gauge::default()
                     .block(Block::default().title("总体CPU使用率").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Cyan))
                     .percent(cpu_stats.total_usage as u16);
-                frame.render_widget(gauge, cpu_chunks[1]);
+                frame.render_widget(gauge, left_chunks[1]);
 
                 // CPU 核心列表
                 let core_count = cpu_stats.core_usage.len();
-                let cores_per_page = ((cpu_chunks[2].height as usize - 2) / 2) * 2; // 确保是偶数
+                let cores_per_page = ((left_chunks[2].height as usize - 2) / 2) * 2; // 确保是偶数
 
                 let items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
@@ -135,7 +136,47 @@ impl Tui {
                     .block(Block::default().title(scroll_indicator).borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
 
-                frame.render_widget(cores_list, cpu_chunks[2]);
+                frame.render_widget(cores_list, left_chunks[2]);
+            }
+
+            // GPU 信息显示
+            if let Ok(gpu_stats) = monitor.gpu_stats() {
+                let gpu_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(3),  // GPU型号
+                        Constraint::Length(3),  // GPU使用率
+                        Constraint::Length(3),  // 显存使用率
+                    ].as_ref())
+                    .split(left_chunks[3]);
+
+                // GPU型号
+                let gpu_info = Paragraph::new(gpu_stats.name)
+                    .block(Block::default().title("GPU信息").borders(Borders::ALL))
+                    .style(Style::default().fg(Color::Green));
+                frame.render_widget(gpu_info, gpu_chunks[0]);
+
+                // GPU使用率
+                let gpu_usage = Gauge::default()
+                    .block(Block::default().title("GPU使用率").borders(Borders::ALL))
+                    .gauge_style(Style::default().fg(Color::Green))
+                    .label(format!("{}% ({}°C)", gpu_stats.utilization, gpu_stats.temperature))
+                    .percent(gpu_stats.utilization as u16);
+                frame.render_widget(gpu_usage, gpu_chunks[1]);
+
+                // 显存使用率
+                let memory_usage = (gpu_stats.memory_used as f64 / gpu_stats.memory_total as f64 * 100.0) as u16;
+                let memory_gauge = Gauge::default()
+                    .block(Block::default().title("显存使用率").borders(Borders::ALL))
+                    .gauge_style(Style::default().fg(Color::Green))
+                    .label(format!(
+                        "已用: {} / 总计: {} ({:.1}%)",
+                        MemoryMonitor::format_bytes(gpu_stats.memory_used),
+                        MemoryMonitor::format_bytes(gpu_stats.memory_total),
+                        memory_usage as f64
+                    ))
+                    .percent(memory_usage);
+                frame.render_widget(memory_gauge, gpu_chunks[2]);
             }
 
             // Memory 和 Swap 部分
