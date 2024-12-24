@@ -2,9 +2,10 @@ pub mod cpu;
 pub mod memory;
 pub mod disk;
 pub mod network;
+pub mod gpu;
 
 use sysinfo::{System, SystemExt, CpuExt};
-use crate::error::Result;
+use crate::error::{Result, LiteMonError};
 use self::cpu::{CpuMonitor, CpuStats};
 use self::memory::{MemoryMonitor, MemoryStats};
 use self::disk::{DiskMonitor, DiskStats};
@@ -12,6 +13,7 @@ use self::network::{NetworkMonitor, NetworkStats};
 
 pub struct Monitor {
     sys: System,
+    gpu_monitor: Option<gpu::GpuMonitor>,
     cpu_monitor: CpuMonitor,
     memory_monitor: MemoryMonitor,
     disk_monitor: DiskMonitor,
@@ -20,10 +22,12 @@ pub struct Monitor {
 
 impl Monitor {
     pub fn new() -> Self {
+        let gpu_monitor = gpu::GpuMonitor::new().ok();
         let mut sys = System::new_all();
         sys.refresh_all();
         Self {
             sys,
+            gpu_monitor,
             cpu_monitor: CpuMonitor::new(),
             memory_monitor: MemoryMonitor::new(),
             disk_monitor: DiskMonitor::new(),
@@ -58,5 +62,13 @@ impl Monitor {
 
     pub fn network_stats(&mut self) -> Result<Vec<NetworkStats>> {
         self.network_monitor.collect_stats(&self.sys)
+    }
+
+    pub fn gpu_stats(&self) -> Result<gpu::GpuStats> {
+        if let Some(gpu) = &self.gpu_monitor {
+            gpu.collect_stats()
+        } else {
+            Err(LiteMonError::NoGpuFound)
+        }
     }
 } 
