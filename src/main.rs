@@ -18,9 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tui.init()?;
 
     let tick_rate = Duration::from_secs(1);
-    let event_poll_rate = Duration::from_millis(250);
+    let scroll_rate = Duration::from_millis(50);
     let mut last_tick = Instant::now();
-    let mut last_event_poll = Instant::now();
+    let mut last_scroll = Instant::now();
     let mut redraw_needed = true;
 
     loop {
@@ -31,25 +31,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tui.draw(&mut monitor)?;
             last_tick = now;
             redraw_needed = false;
-            continue;
         }
 
-        if now.duration_since(last_event_poll) >= event_poll_rate {
-            if event::poll(Duration::ZERO)? {
-                if let Event::Key(key) = event::read()? {
-                    match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Up | KeyCode::Down => {
+        if event::poll(Duration::from_millis(10))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Up | KeyCode::Down => {
+                        if now.duration_since(last_scroll) >= scroll_rate {
                             if let Ok(cpu_stats) = monitor.cpu_stats() {
                                 tui.handle_scroll(key, cpu_stats.core_usage.len());
                                 redraw_needed = true;
+                                last_scroll = now;
                             }
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
             }
-            last_event_poll = now;
         }
 
         if redraw_needed {
@@ -57,7 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             redraw_needed = false;
         }
 
-        std::thread::sleep(Duration::from_millis(50));
+        std::thread::sleep(Duration::from_millis(10));
     }
 
     tui.cleanup()?;
