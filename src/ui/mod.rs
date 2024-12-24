@@ -112,7 +112,7 @@ impl Tui {
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, cpu_chunks[1]);
 
-                // CPU 核心列表
+                // CPU 核��列表
                 let core_count = cpu_stats.core_usage.len();
                 let cores_per_page = ((cpu_chunks[2].height as usize - 2) / 2) * 2; // 确保是偶数
 
@@ -219,34 +219,28 @@ impl Tui {
                 }
             }
 
-            // Network 部分改为简单列表显示
+            // Network 部分
             if let Ok(net_stats) = monitor.network_stats() {
-                let net_area = info_chunks[3];
-                let net_chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(
-                        net_stats.iter().map(|_| Constraint::Length(3)).collect::<Vec<_>>()
-                    )
-                    .split(net_area);
+                let net_area = info_chunks[2];  // 使用正确的索引
+                let net_list_items: Vec<ListItem> = net_stats.iter()
+                    .map(|net| {
+                        ListItem::new(format!(
+                            "↓{}/s ↑{}/s (总计: ↓{} ↑{})",
+                            NetworkMonitor::format_speed(net.received_bytes as f64),
+                            NetworkMonitor::format_speed(net.transmitted_bytes as f64),
+                            MemoryMonitor::format_bytes(net.total_received),
+                            MemoryMonitor::format_bytes(net.total_transmitted),
+                        ))
+                    })
+                    .collect();
 
-                for (i, net) in net_stats.iter().enumerate() {
-                    let net_info = format!(
-                        "{}: ↓{}/s ↑{}/s (总计: ↓{} ↑{})",
-                        net.interface_name,
-                        NetworkMonitor::format_speed(net.received_bytes as f64),
-                        NetworkMonitor::format_speed(net.transmitted_bytes as f64),
-                        MemoryMonitor::format_bytes(net.total_received),
-                        MemoryMonitor::format_bytes(net.total_transmitted),
-                    );
+                let net_list = List::new(net_list_items)
+                    .block(Block::default()
+                        .title("网络接口状态")
+                        .borders(Borders::ALL))
+                    .style(Style::default().fg(Color::Blue));
 
-                    let net_text = Paragraph::new(net_info)
-                        .block(Block::default()
-                            .title(net.interface_name.clone())
-                            .borders(Borders::ALL))
-                        .style(Style::default().fg(Color::Blue));
-
-                    frame.render_widget(net_text, net_chunks[i]);
-                }
+                frame.render_widget(net_list, net_area);
             }
         })?;
 
