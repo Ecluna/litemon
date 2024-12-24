@@ -50,10 +50,10 @@ impl Tui {
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([
-                    Constraint::Length(20),  // 增加 CPU 区域高度
-                    Constraint::Length(8),   // Memory
-                    Constraint::Length(8),   // Disk
-                    Constraint::Min(8),      // Network
+                    Constraint::Length(20),  // CPU
+                    Constraint::Length(6),   // Memory
+                    Constraint::Length(6),   // Disk
+                    Constraint::Min(6),      // Network
                 ].as_ref())
                 .split(size);
 
@@ -132,19 +132,35 @@ impl Tui {
                 let memory_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Length(3),
-                        Constraint::Length(3),
+                        Constraint::Length(3),  // 内存使用率
+                        Constraint::Length(3),  // 交换分区使用率
                     ].as_ref())
                     .split(chunks[1]);
 
+                let memory_text = format!(
+                    "已用: {} / 总计: {} ({:.1}%)",
+                    MemoryMonitor::format_bytes(mem_stats.used),
+                    MemoryMonitor::format_bytes(mem_stats.total),
+                    memory_usage as f64
+                );
+
                 let memory_gauge = Gauge::default()
-                    .block(Block::default().title("内存使用率").borders(Borders::ALL))
+                    .block(Block::default().title("内存使用情况").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Yellow))
+                    .label(memory_text)
                     .percent(memory_usage);
 
+                let swap_text = format!(
+                    "已用: {} / 总计: {} ({:.1}%)",
+                    MemoryMonitor::format_bytes(mem_stats.swap_used),
+                    MemoryMonitor::format_bytes(mem_stats.swap_total),
+                    swap_usage as f64
+                );
+
                 let swap_gauge = Gauge::default()
-                    .block(Block::default().title("交换分区使用率").borders(Borders::ALL))
+                    .block(Block::default().title("交换分区").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Magenta))
+                    .label(swap_text)
                     .percent(swap_usage);
 
                 frame.render_widget(memory_gauge, memory_chunks[0]);
@@ -158,8 +174,10 @@ impl Tui {
                     .map(|disk| {
                         let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
                         ListItem::new(format!(
-                            "{}: {:.1}% 已用 ({})",
+                            "{}: {} / {} ({:.1}%) [{}]",
                             disk.mount_point,
+                            MemoryMonitor::format_bytes(disk.used_space),
+                            MemoryMonitor::format_bytes(disk.total_space),
                             usage,
                             disk.disk_type
                         ))
@@ -179,10 +197,12 @@ impl Tui {
                     .iter()
                     .map(|net| {
                         ListItem::new(format!(
-                            "{}: ↓{} ↑{}",
+                            "{}: ↓{}/s ↑{}/s (总计: ↓{} ↑{})",
                             net.interface_name,
                             NetworkMonitor::format_speed(net.received_bytes as f64),
                             NetworkMonitor::format_speed(net.transmitted_bytes as f64),
+                            MemoryMonitor::format_bytes(net.total_received),
+                            MemoryMonitor::format_bytes(net.total_transmitted),
                         ))
                     })
                     .collect();
