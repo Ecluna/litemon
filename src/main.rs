@@ -3,7 +3,7 @@ mod monitor;
 mod cli;
 mod ui;
 
-use std::{thread, time::Duration};
+use std::time::Duration;
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
 use monitor::Monitor;
