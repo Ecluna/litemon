@@ -1,4 +1,3 @@
-use std::time::Duration;
 use sysinfo::{CpuExt, System, SystemExt};
 use crate::error::Result;
 
