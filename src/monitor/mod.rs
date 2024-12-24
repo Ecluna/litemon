@@ -3,7 +3,7 @@ pub mod memory;
 pub mod disk;
 pub mod network;
 
-use sysinfo::{System, SystemExt};
+use sysinfo::{System, SystemExt, CpuExt};
 use crate::error::Result;
 use self::cpu::{CpuMonitor, CpuStats};
 use self::memory::{MemoryMonitor, MemoryStats};

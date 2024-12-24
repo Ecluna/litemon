@@ -5,7 +5,7 @@ mod ui;
 
 use std::time::Duration;
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use monitor::Monitor;
 use cli::Cli;
 use ui::Tui;
