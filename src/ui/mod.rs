@@ -25,8 +25,6 @@ use crate::{
 pub struct Tui {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     cpu_scroll: usize,
-    network_history: Vec<Vec<(String, f64)>>,
-    history_len: usize,
 }
 
 impl Tui {
@@ -36,8 +34,6 @@ impl Tui {
         Ok(Self { 
             terminal,
             cpu_scroll: 0,
-            network_history: Vec::new(),
-            history_len: 50,
         })
     }
 
@@ -68,25 +64,7 @@ impl Tui {
         Ok(())
     }
 
-    fn update_history(&mut self, monitor: &mut Monitor) {
-        if let Ok(net_stats) = monitor.network_stats() {
-            if self.network_history.len() != net_stats.len() {
-                self.network_history = vec![Vec::with_capacity(self.history_len); net_stats.len()];
-            }
-
-            for (i, net) in net_stats.iter().enumerate() {
-                let speed = net.received_bytes as f64 + net.transmitted_bytes as f64;
-                if self.network_history[i].len() >= self.history_len {
-                    self.network_history[i].remove(0);
-                }
-                self.network_history[i].push((net.interface_name.clone(), speed));
-            }
-        }
-    }
-
     pub fn draw(&mut self, monitor: &mut Monitor) -> Result<()> {
-        self.update_history(monitor);
-
         self.terminal.draw(|frame| {
             let size = frame.size();
 
@@ -189,7 +167,7 @@ impl Tui {
                     .block(Block::default().title("交换分区").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Magenta))
                     .label(format!(
-                        "已用: {} / ��计: {} ({:.1}%)",
+                        "已用: {} / 总计: {} ({:.1}%)",
                         MemoryMonitor::format_bytes(mem_stats.swap_used),
                         MemoryMonitor::format_bytes(mem_stats.swap_total),
                         swap_usage as f64
@@ -241,7 +219,7 @@ impl Tui {
                 }
             }
 
-            // Network with sparkline
+            // Network 部分改为简单列表显示
             if let Ok(net_stats) = monitor.network_stats() {
                 let net_area = info_chunks[3];
                 let net_chunks = Layout::default()
@@ -252,31 +230,22 @@ impl Tui {
                     .split(net_area);
 
                 for (i, net) in net_stats.iter().enumerate() {
-                    if i < self.network_history.len() {
-                        let sparkline_data: Vec<u64> = self.network_history[i]
-                            .iter()
-                            .map(|(_, speed)| *speed as u64)
-                            .collect();
+                    let net_info = format!(
+                        "{}: ↓{}/s ↑{}/s (总计: ↓{} ↑{})",
+                        net.interface_name,
+                        NetworkMonitor::format_speed(net.received_bytes as f64),
+                        NetworkMonitor::format_speed(net.transmitted_bytes as f64),
+                        MemoryMonitor::format_bytes(net.total_received),
+                        MemoryMonitor::format_bytes(net.total_transmitted),
+                    );
 
-                        let net_info = format!(
-                            "{}: ↓{}/s ↑{}/s",
-                            net.interface_name,
-                            NetworkMonitor::format_speed(net.received_bytes as f64),
-                            NetworkMonitor::format_speed(net.transmitted_bytes as f64),
-                        );
+                    let net_text = Paragraph::new(net_info)
+                        .block(Block::default()
+                            .title(net.interface_name.clone())
+                            .borders(Borders::ALL))
+                        .style(Style::default().fg(Color::Blue));
 
-                        let net_block = Block::default()
-                            .title(net_info)
-                            .borders(Borders::ALL)
-                            .style(Style::default().fg(Color::Blue));
-
-                        let sparkline = Sparkline::default()
-                            .block(net_block)
-                            .data(&sparkline_data)
-                            .style(Style::default().fg(Color::Blue));
-
-                        frame.render_widget(sparkline, net_chunks[i]);
-                    }
+                    frame.render_widget(net_text, net_chunks[i]);
                 }
             }
         })?;
