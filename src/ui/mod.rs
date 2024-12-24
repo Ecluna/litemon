@@ -70,9 +70,10 @@ impl Tui {
 
     fn update_history(&mut self, monitor: &mut Monitor) {
         if let Ok(net_stats) = monitor.network_stats() {
-            if self.network_history.is_empty() {
+            if self.network_history.len() != net_stats.len() {
                 self.network_history = vec![Vec::with_capacity(self.history_len); net_stats.len()];
             }
+
             for (i, net) in net_stats.iter().enumerate() {
                 let speed = net.received_bytes as f64 + net.transmitted_bytes as f64;
                 if self.network_history[i].len() >= self.history_len {
@@ -188,7 +189,7 @@ impl Tui {
                     .block(Block::default().title("交换分区").borders(Borders::ALL))
                     .gauge_style(Style::default().fg(Color::Magenta))
                     .label(format!(
-                        "已用: {} / 总计: {} ({:.1}%)",
+                        "已用: {} / ��计: {} ({:.1}%)",
                         MemoryMonitor::format_bytes(mem_stats.swap_used),
                         MemoryMonitor::format_bytes(mem_stats.swap_total),
                         swap_usage as f64
@@ -251,29 +252,31 @@ impl Tui {
                     .split(net_area);
 
                 for (i, net) in net_stats.iter().enumerate() {
-                    let sparkline_data: Vec<u64> = self.network_history[i]
-                        .iter()
-                        .map(|(_, speed)| *speed as u64)
-                        .collect();
+                    if i < self.network_history.len() {
+                        let sparkline_data: Vec<u64> = self.network_history[i]
+                            .iter()
+                            .map(|(_, speed)| *speed as u64)
+                            .collect();
 
-                    let net_info = format!(
-                        "{}: ↓{}/s ↑{}/s",
-                        net.interface_name,
-                        NetworkMonitor::format_speed(net.received_bytes as f64),
-                        NetworkMonitor::format_speed(net.transmitted_bytes as f64),
-                    );
+                        let net_info = format!(
+                            "{}: ↓{}/s ↑{}/s",
+                            net.interface_name,
+                            NetworkMonitor::format_speed(net.received_bytes as f64),
+                            NetworkMonitor::format_speed(net.transmitted_bytes as f64),
+                        );
 
-                    let net_block = Block::default()
-                        .title(net_info)
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(Color::Blue));
+                        let net_block = Block::default()
+                            .title(net_info)
+                            .borders(Borders::ALL)
+                            .style(Style::default().fg(Color::Blue));
 
-                    let sparkline = Sparkline::default()
-                        .block(net_block)
-                        .data(&sparkline_data)
-                        .style(Style::default().fg(Color::Blue));
+                        let sparkline = Sparkline::default()
+                            .block(net_block)
+                            .data(&sparkline_data)
+                            .style(Style::default().fg(Color::Blue));
 
-                    frame.render_widget(sparkline, net_chunks[i]);
+                        frame.render_widget(sparkline, net_chunks[i]);
+                    }
                 }
             }
         })?;
