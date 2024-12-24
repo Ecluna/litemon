@@ -91,9 +91,9 @@ impl Tui {
             let info_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(8),   // 内存和交换分区 (增加高度以容纳两个组件)
-                    Constraint::Length(6),   // 磁盘信息
-                    Constraint::Min(4),      // 网络信息
+                    Constraint::Length(8),   // 内存和交换分区
+                    Constraint::Length(8),   // 磁盘信息
+                    Constraint::Length(12),  // 网络信息
                 ].as_ref())
                 .split(main_chunks[1]);
 
@@ -112,7 +112,7 @@ impl Tui {
                     .percent(cpu_stats.total_usage as u16);
                 frame.render_widget(gauge, cpu_chunks[1]);
 
-                // CPU 核��列表
+                // CPU 核心列表
                 let core_count = cpu_stats.core_usage.len();
                 let cores_per_page = ((cpu_chunks[2].height as usize - 2) / 2) * 2; // 确保是偶数
 
@@ -178,9 +178,9 @@ impl Tui {
                 frame.render_widget(swap_gauge, memory_chunks[1]);
             }
 
-            // Disk with sparkline
+            // Disk 部分
             if let Ok(disk_stats) = monitor.disk_stats() {
-                let disk_area = info_chunks[2];
+                let disk_area = info_chunks[1];  // 使用索引1
                 let disk_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints(
@@ -221,11 +221,12 @@ impl Tui {
 
             // Network 部分
             if let Ok(net_stats) = monitor.network_stats() {
-                let net_area = info_chunks[2];  // 使用正确的索引
+                let net_area = info_chunks[2];  // 使用索引2
                 let net_list_items: Vec<ListItem> = net_stats.iter()
                     .map(|net| {
                         ListItem::new(format!(
-                            "↓{}/s ↑{}/s (总计: ↓{} ↑{})",
+                            "{}: ↓{}/s ↑{}/s (总计: ↓{} ↑{})",
+                            net.interface_name,
                             NetworkMonitor::format_speed(net.received_bytes as f64),
                             NetworkMonitor::format_speed(net.transmitted_bytes as f64),
                             MemoryMonitor::format_bytes(net.total_received),
