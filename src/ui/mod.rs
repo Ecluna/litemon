@@ -1,25 +1,22 @@
 use std::io;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    symbols,
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Sparkline},
+    style::{Color, Style},
+    widgets::{Block, Borders, Gauge, List, ListItem},
     Frame, Terminal,
 };
 
 use crate::{
     monitor::{
-        cpu::CpuStats,
-        memory::MemoryStats,
-        disk::DiskStats,
-        network::NetworkStats,
         Monitor,
+        disk::DiskMonitor,
+        network::NetworkMonitor,
     },
     error::Result,
 };
@@ -47,24 +44,29 @@ impl Tui {
     }
 
     pub fn draw(&mut self, monitor: &mut Monitor) -> Result<()> {
-        self.terminal.draw(|frame| {
-            let size = frame.size();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(1)
-                .constraints([
-                    Constraint::Length(3),  // CPU
-                    Constraint::Length(8),  // Memory
-                    Constraint::Length(8),  // Disk
-                    Constraint::Min(8),     // Network
-                ].as_ref())
-                .split(size);
-
-            self.draw_cpu(frame, monitor, chunks[0]);
-            self.draw_memory(frame, monitor, chunks[1]);
-            self.draw_disk(frame, monitor, chunks[2]);
-            self.draw_network(frame, monitor, chunks[3]);
+        let mut frame = None;
+        self.terminal.draw(|f| {
+            frame = Some(f);
         })?;
+
+        let frame = frame.unwrap();
+        let size = frame.size();
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(3),  // CPU
+                Constraint::Length(8),  // Memory
+                Constraint::Length(8),  // Disk
+                Constraint::Min(8),     // Network
+            ].as_ref())
+            .split(size);
+
+        self.draw_cpu(frame, monitor, chunks[0]);
+        self.draw_memory(frame, monitor, chunks[1]);
+        self.draw_disk(frame, monitor, chunks[2]);
+        self.draw_network(frame, monitor, chunks[3]);
+
         Ok(())
     }
 
