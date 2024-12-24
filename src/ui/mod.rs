@@ -16,6 +16,7 @@ use crate::{
     monitor::{
         Monitor,
         disk::DiskMonitor,
+        memory::MemoryMonitor,
         network::NetworkMonitor,
     },
     error::Result,
