@@ -40,7 +40,12 @@ impl Monitor {
     }
 
     pub fn cpu_info(&self) -> String {
-        CpuMonitor::get_cpu_info(&self.sys)
+        let info = self.sys.global_cpu_info();
+        format!(
+            "{}\n频率: {:.1} GHz",
+            info.brand(),
+            info.frequency() as f64 / 1000.0
+        )
     }
 
     pub fn memory_stats(&self) -> Result<MemoryStats> {

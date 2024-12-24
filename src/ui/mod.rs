@@ -50,7 +50,7 @@ impl Tui {
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([
-                    Constraint::Length(15),  // CPU (增加高度以适应更多内容)
+                    Constraint::Length(20),  // 增加 CPU 区域高度
                     Constraint::Length(8),   // Memory
                     Constraint::Length(8),   // Disk
                     Constraint::Min(8),      // Network
@@ -63,7 +63,7 @@ impl Tui {
                 let cpu_chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Length(2),  // CPU型号
+                        Constraint::Length(3),  // CPU型号
                         Constraint::Length(3),  // 总体 CPU 使用率
                         Constraint::Min(0),     // CPU 核心列表
                     ].as_ref())
@@ -71,7 +71,7 @@ impl Tui {
 
                 // CPU型号信息
                 let cpu_info = Paragraph::new(monitor.cpu_info())
-                    .block(Block::default().borders(Borders::ALL))
+                    .block(Block::default().title("CPU信息").borders(Borders::ALL))
                     .style(Style::default().fg(Color::Cyan));
                 frame.render_widget(cpu_info, cpu_chunks[0]);
 
@@ -92,10 +92,11 @@ impl Tui {
                     ].as_ref())
                     .split(cores_area);
 
+                // 调整核心列表显示，确保所有核心都能显示
                 let core_count = cpu_stats.core_usage.len();
-                let left_cores = core_count / 2 + core_count % 2;
+                let left_cores = (core_count + 1) / 2;  // 向上取整
 
-                // 左侧核心列表
+                // 左侧核心列表（0-9）
                 let left_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
@@ -103,7 +104,7 @@ impl Tui {
                     .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
-                // 右侧核心列表
+                // 右侧核心列表（10-19）
                 let right_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()

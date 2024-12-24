@@ -5,7 +5,7 @@ mod ui;
 
 use std::time::Duration;
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use monitor::Monitor;
 use cli::Cli;
 use ui::Tui;
@@ -21,23 +21,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = std::time::Instant::now();
 
     loop {
-        monitor.refresh();
-        tui.draw(&mut monitor)?;
-
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.code == KeyCode::Char('q') {
-                    break;
-                }
-            }
+        if last_tick.elapsed() >= tick_rate {
+            monitor.refresh();
+            tui.draw(&mut monitor)?;
+            last_tick = std::time::Instant::now();
         }
 
-        if last_tick.elapsed() >= tick_rate {
-            last_tick = std::time::Instant::now();
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) = event::read()? {
+                break;
+            }
         }
     }
 
