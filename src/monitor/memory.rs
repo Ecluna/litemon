@@ -20,11 +20,9 @@ impl MemoryMonitor {
         Ok(MemoryStats {
             total: sys.total_memory(),
             used: sys.used_memory(),
-            free: sys.free_memory(),
             available: sys.available_memory(),
             swap_total: sys.total_swap(),
             swap_used: sys.used_swap(),
-            swap_free: sys.free_swap(),
         })
     }
 

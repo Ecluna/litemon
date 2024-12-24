@@ -27,19 +27,36 @@ impl NetworkMonitor {
 
     pub fn collect_stats(&mut self, sys: &System) -> Result<Vec<NetworkStats>> {
         let mut current_stats = Vec::new();
+        let now = Instant::now();
+        let interval = now.duration_since(self.last_update).as_secs_f64();
         
         for (interface_name, data) in sys.networks() {
-            current_stats.push(NetworkStats {
+            let previous = self.previous_stats.get(interface_name);
+            let received_bytes = if let Some(prev) = previous {
+                Self::calculate_speed(data.received(), prev.received_bytes, interval)
+            } else {
+                0.0
+            } as u64;
+
+            let transmitted_bytes = if let Some(prev) = previous {
+                Self::calculate_speed(data.transmitted(), prev.transmitted_bytes, interval)
+            } else {
+                0.0
+            } as u64;
+
+            let stats = NetworkStats {
                 interface_name: interface_name.to_string(),
-                received_bytes: data.received(),
+                received_bytes,
                 total_received: data.total_received(),
-                transmitted_bytes: data.transmitted(),
+                transmitted_bytes,
                 total_transmitted: data.total_transmitted(),
-            });
+            };
+
+            current_stats.push(stats.clone());
+            self.previous_stats.insert(interface_name.to_string(), stats);
         }
 
-        // 更新之前的统计信息
-        self.previous_stats = current_stats.clone();
+        self.last_update = now;
         Ok(current_stats)
     }
 

@@ -15,10 +15,12 @@ pub struct CpuMonitor {
 
 impl CpuMonitor {
     pub fn new() -> Self {
-        Self
+        Self {
+            previous_measurement: None,
+        }
     }
 
-    pub fn collect_stats(&self, sys: &System) -> Result<CpuStats> {
+    pub fn collect_stats(&mut self, sys: &System) -> Result<CpuStats> {
         let core_count = sys.cpus().len();
         let mut stats = CpuStats {
             total_usage: 0.0,
