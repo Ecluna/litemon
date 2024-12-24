@@ -1,5 +1,7 @@
 use sysinfo::{NetworkExt, System, SystemExt};
 use crate::error::Result;
+use std::collections::HashMap;
+use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct NetworkStats {
@@ -11,13 +13,15 @@ pub struct NetworkStats {
 }
 
 pub struct NetworkMonitor {
-    previous_stats: Vec<NetworkStats>,
+    previous_stats: HashMap<String, NetworkStats>,
+    last_update: Instant,
 }
 
 impl NetworkMonitor {
     pub fn new() -> Self {
         Self {
-            previous_stats: Vec::new(),
+            previous_stats: HashMap::new(),
+            last_update: Instant::now(),
         }
     }
 

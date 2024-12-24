@@ -8,7 +8,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Sparkline},
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
     Terminal,
 };
 
@@ -83,7 +83,7 @@ impl Tui {
                 .constraints([
                     Constraint::Length(3),  // CPU型号
                     Constraint::Length(3),  // CPU使用率
-                    Constraint::Min(0),     // CPU核��表
+                    Constraint::Min(0),     // CPU核表
                     Constraint::Length(10), // GPU 信息
                 ].as_ref())
                 .split(main_chunks[0]);

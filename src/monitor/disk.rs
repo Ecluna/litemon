@@ -4,11 +4,9 @@ use crate::error::Result;
 #[derive(Debug, Clone)]
 pub struct DiskStats {
     pub name: String,
-    pub mount_point: String,
-    pub total_space: u64,
-    pub available_space: u64,
-    pub used_space: u64,
     pub disk_type: String,
+    pub total_space: u64,
+    pub used_space: u64,
     pub is_removable: bool,
 }
 
@@ -25,11 +23,9 @@ impl DiskMonitor {
         for disk in sys.disks() {
             stats.push(DiskStats {
                 name: disk.name().to_string_lossy().into_owned(),
-                mount_point: disk.mount_point().to_string_lossy().into_owned(),
-                total_space: disk.total_space(),
-                available_space: disk.available_space(),
-                used_space: disk.total_space() - disk.available_space(),
                 disk_type: format!("{:?}", disk.kind()),
+                total_space: disk.total_space(),
+                used_space: disk.total_space() - disk.available_space(),
                 is_removable: disk.is_removable(),
             });
         }
