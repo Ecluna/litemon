@@ -8,12 +8,14 @@ use crate::error::Result;
 use self::cpu::{CpuMonitor, CpuStats};
 use self::memory::{MemoryMonitor, MemoryStats};
 use self::disk::{DiskMonitor, DiskStats};
+use self::network::{NetworkMonitor, NetworkStats};
 
 pub struct Monitor {
     sys: System,
     cpu_monitor: CpuMonitor,
     memory_monitor: MemoryMonitor,
     disk_monitor: DiskMonitor,
+    network_monitor: NetworkMonitor,
 }
 
 impl Monitor {
@@ -25,6 +27,7 @@ impl Monitor {
             cpu_monitor: CpuMonitor::new(),
             memory_monitor: MemoryMonitor::new(),
             disk_monitor: DiskMonitor::new(),
+            network_monitor: NetworkMonitor::new(),
         }
     }
 
@@ -46,5 +49,9 @@ impl Monitor {
 
     pub fn disk_stats(&self) -> Result<Vec<DiskStats>> {
         self.disk_monitor.collect_stats(&self.sys)
+    }
+
+    pub fn network_stats(&mut self) -> Result<Vec<NetworkStats>> {
+        self.network_monitor.collect_stats(&self.sys)
     }
 } 
