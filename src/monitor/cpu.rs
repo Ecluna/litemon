@@ -41,14 +41,6 @@ impl CpuMonitor {
         self.previous_measurement = Some(stats.clone());
         Ok(stats)
     }
-
-    pub fn get_cpu_info(sys: &System) -> String {
-        format!(
-            "CPU Info: {} - {} cores",
-            sys.global_cpu_info().brand(),
-            sys.cpus().len()
-        )
-    }
 }
 
 // 为了方便在TUI中显示，实现Clone特征
