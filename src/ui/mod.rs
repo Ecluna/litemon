@@ -96,19 +96,19 @@ impl Tui {
                 let left_cores = core_count / 2 + core_count % 2;
 
                 // 左侧核心列表
-                let left_items: Vec<ListItem> = cpu_stats.core_usage.iter()
+                let left_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
                     .take(left_cores)
-                    .map(|(i, (usage, freq))| create_core_list_item(i, *usage, *freq))
+                    .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
                 // 右侧核心列表
-                let right_items: Vec<ListItem> = cpu_stats.core_usage.iter()
+                let right_items: Vec<ListItem<'_>> = cpu_stats.core_usage.iter()
                     .zip(cpu_stats.frequency.iter())
                     .enumerate()
                     .skip(left_cores)
-                    .map(|(i, (usage, freq))| create_core_list_item(i, *usage, *freq))
+                    .map(|(i, (usage, freq))| Self::create_core_list_item(i, *usage, *freq))
                     .collect();
 
                 let left_list = List::new(left_items)
@@ -208,8 +208,7 @@ impl Tui {
         Ok(())
     }
 
-    // 辅助函数：创建核心列表项
-    fn create_core_list_item(index: usize, usage: f32, freq: u64) -> ListItem {
+    fn create_core_list_item(index: usize, usage: f32, freq: u64) -> ListItem<'static> {
         let usage_gauge = format!(
             "{:3.1}% [{}{}]",
             usage,

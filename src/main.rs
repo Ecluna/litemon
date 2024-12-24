@@ -11,7 +11,7 @@ use cli::Cli;
 use ui::Tui;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
+    let _cli = Cli::parse();
     let mut monitor = Monitor::new();
     let mut tui = Tui::new()?;
 
