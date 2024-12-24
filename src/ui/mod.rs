@@ -112,10 +112,9 @@ impl Tui {
             let info_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3),  // 内存使用率
-                    Constraint::Length(3),  // 交换分区
-                    Constraint::Length(6),  // 磁盘信息
-                    Constraint::Min(4),     // 网���信息
+                    Constraint::Length(8),   // 内存和交换分区 (增加高度以容纳两个组件)
+                    Constraint::Length(6),   // 磁盘信息
+                    Constraint::Min(4),      // 网络信息
                 ].as_ref())
                 .split(main_chunks[1]);
 
@@ -160,8 +159,7 @@ impl Tui {
                 frame.render_widget(cores_list, cpu_chunks[2]);
             }
 
-            // 右侧信息渲染
-            // Memory
+            // Memory 和 Swap 部分
             if let Ok(mem_stats) = monitor.memory_stats() {
                 let memory_chunks = Layout::default()
                     .direction(Direction::Vertical)
