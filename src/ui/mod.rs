@@ -25,7 +25,6 @@ use crate::{
 pub struct Tui {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     cpu_scroll: usize,
-    disk_history: Vec<Vec<(String, f64)>>,
     network_history: Vec<Vec<(String, f64)>>,
     history_len: usize,
 }
@@ -37,7 +36,6 @@ impl Tui {
         Ok(Self { 
             terminal,
             cpu_scroll: 0,
-            disk_history: Vec::new(),
             network_history: Vec::new(),
             history_len: 50,
         })
@@ -71,19 +69,6 @@ impl Tui {
     }
 
     fn update_history(&mut self, monitor: &mut Monitor) {
-        if let Ok(disk_stats) = monitor.disk_stats() {
-            if self.disk_history.is_empty() {
-                self.disk_history = vec![Vec::with_capacity(self.history_len); disk_stats.len()];
-            }
-            for (i, disk) in disk_stats.iter().enumerate() {
-                let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
-                if self.disk_history[i].len() >= self.history_len {
-                    self.disk_history[i].remove(0);
-                }
-                self.disk_history[i].push((disk.name.clone(), usage));
-            }
-        }
-
         if let Ok(net_stats) = monitor.network_stats() {
             if self.network_history.is_empty() {
                 self.network_history = vec![Vec::with_capacity(self.history_len); net_stats.len()];
@@ -178,6 +163,16 @@ impl Tui {
             // 右侧信息渲染
             // Memory
             if let Ok(mem_stats) = monitor.memory_stats() {
+                let memory_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(3),  // 内存使用率
+                        Constraint::Length(3),  // 内存频率
+                        Constraint::Length(3),  // 交换分区使用率
+                    ].as_ref())
+                    .split(info_chunks[0]);
+
+                // 内存使用率
                 let memory_usage = (mem_stats.used as f64 / mem_stats.total as f64 * 100.0) as u16;
                 let memory_gauge = Gauge::default()
                     .block(Block::default().title("内存使用情况").borders(Borders::ALL))
@@ -190,6 +185,15 @@ impl Tui {
                     ))
                     .percent(memory_usage);
 
+                // 内存频率
+                let memory_freq = Paragraph::new(format!(
+                    "频率: {:.1} MHz",
+                    mem_stats.frequency as f64
+                ))
+                .block(Block::default().title("内存频率").borders(Borders::ALL))
+                .style(Style::default().fg(Color::Yellow));
+
+                // 交换分区
                 let swap_usage = (mem_stats.swap_used as f64 / mem_stats.swap_total as f64 * 100.0) as u16;
                 let swap_gauge = Gauge::default()
                     .block(Block::default().title("交换分区").borders(Borders::ALL))
@@ -202,8 +206,9 @@ impl Tui {
                     ))
                     .percent(swap_usage);
 
-                frame.render_widget(memory_gauge, info_chunks[0]);
-                frame.render_widget(swap_gauge, info_chunks[1]);
+                frame.render_widget(memory_gauge, memory_chunks[0]);
+                frame.render_widget(memory_freq, memory_chunks[1]);
+                frame.render_widget(swap_gauge, memory_chunks[2]);
             }
 
             // Disk with sparkline
@@ -218,35 +223,32 @@ impl Tui {
 
                 for (i, disk) in disk_stats.iter().enumerate() {
                     let usage = DiskMonitor::usage_percentage(disk.total_space, disk.used_space);
-                    let sparkline_data: Vec<u64> = self.disk_history[i]
-                        .iter()
-                        .map(|(_, usage)| *usage as u64)
-                        .collect();
+                    let disk_type = if disk.is_removable {
+                        format!("{} [可移动]", disk.disk_type)
+                    } else {
+                        disk.disk_type.clone()
+                    };
 
-                    let disk_block = Block::default()
-                        .title(format!(
-                            "{}: {} / {} ({:.1}%)",
-                            disk.name,
-                            MemoryMonitor::format_bytes(disk.used_space),
-                            MemoryMonitor::format_bytes(disk.total_space),
-                            usage
-                        ))
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(if usage > 90.0 {
+                    let gauge = Gauge::default()
+                        .block(Block::default()
+                            .title(format!("{} ({})", disk.name, disk_type))
+                            .borders(Borders::ALL))
+                        .gauge_style(Style::default().fg(if usage > 90.0 {
                             Color::Red
                         } else if usage > 70.0 {
                             Color::Yellow
                         } else {
                             Color::Green
-                        }));
+                        }))
+                        .label(format!(
+                            "已用: {} / 总计: {} ({:.1}%)",
+                            MemoryMonitor::format_bytes(disk.used_space),
+                            MemoryMonitor::format_bytes(disk.total_space),
+                            usage
+                        ))
+                        .percent(usage as u16);
 
-                    let sparkline = Sparkline::default()
-                        .block(disk_block)
-                        .data(&sparkline_data)
-                        .style(Style::default().fg(Color::Green))
-                        .max(100);
-
-                    frame.render_widget(sparkline, disk_chunks[i]);
+                    frame.render_widget(gauge, disk_chunks[i]);
                 }
             }
 
