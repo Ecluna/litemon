@@ -1,6 +1,6 @@
 use std::io;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{self, DisableMouseCapture, EnableMouseCapture, KeyEvent, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -261,7 +261,7 @@ impl Tui {
                     .collect();
 
                 let list = List::new(items)
-                    .block(Block::default().title("网络接口状态").borders(Borders::ALL))
+                    .block(Block::default().title("网络接口��态").borders(Borders::ALL))
                     .style(Style::default().fg(Color::Blue));
 
                 frame.render_widget(list, chunks[3]);
